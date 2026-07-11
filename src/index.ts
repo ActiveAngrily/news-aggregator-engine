@@ -7,6 +7,7 @@ import * as path from 'path';
 
 interface PayloadConfig {
     publishers: any[];
+    aiWriters?: any[];
     parameters?: {
         similarityThreshold?: number;
         maxUrlsPerPublisher?: number;
@@ -31,8 +32,8 @@ function loadConfig(): PayloadConfig {
     return JSON.parse(configContent) as PayloadConfig;
 }
 
-async function sendResultsWebhook(webhookUrl: string, authKey: string, clusters: ArticleCluster[]) {
-    console.log(`[Webhook] Sending clustered results to ${webhookUrl}...`);
+async function sendResultsWebhook(webhookUrl: string, authKey: string, payloadData: any) {
+    console.log(`[Webhook] Sending final results to ${webhookUrl}...`);
     try {
         const response = await fetch(webhookUrl, {
             method: 'POST',
@@ -42,10 +43,7 @@ async function sendResultsWebhook(webhookUrl: string, authKey: string, clusters:
                 'Bypass-Tunnel-Reminder': 'true',
                 'User-Agent': 'node-fetch'
             },
-            body: JSON.stringify({
-                status: 'success',
-                clusters: clusters
-            })
+            body: JSON.stringify(payloadData)
         });
 
         if (response.ok) {
@@ -103,13 +101,29 @@ async function runGatherPipeline() {
         
         const verifiedClusters = await clusteringEngine.clusterArticles(allExtractedArticles);
         
-        // Phase 3: Webhook Return (replaces Appwrite)
+        // Phase 2.5: Synthesis
+        let finalPayloadData = null;
+        if (config.aiWriters && config.aiWriters.length > 0) {
+            const { SynthesisEngine } = require('./engines/SynthesisEngine');
+            const synthesisEngine = new SynthesisEngine(config.aiWriters);
+            const finalArticles = [];
+            for (const cluster of verifiedClusters) {
+                const article = await synthesisEngine.synthesize(cluster);
+                if (article) finalArticles.push(article);
+            }
+            finalPayloadData = { status: 'success', articles: finalArticles };
+        } else {
+            // Fallback for old Commander versions
+            finalPayloadData = { status: 'success', clusters: verifiedClusters };
+        }
+        
+        // Phase 3: Webhook Return
         if (config.returnWebhookUrl && config.authKey) {
-            await sendResultsWebhook(config.returnWebhookUrl, config.authKey, verifiedClusters);
+            await sendResultsWebhook(config.returnWebhookUrl, config.authKey, finalPayloadData);
         } else {
             console.warn('[Webhook] Missing returnWebhookUrl or authKey in config. Skipping return.');
             // Dump to file if needed for debugging
-            fs.writeFileSync('output.json', JSON.stringify(verifiedClusters, null, 2));
+            fs.writeFileSync('output.json', JSON.stringify(finalPayloadData, null, 2));
             console.log('Dumped output to output.json instead.');
         }
 

@@ -1,0 +1,128 @@
+import { GoogleGenAI } from '@google/genai';
+import { ExtractedArticle } from './ExtractionEngine';
+import { ArticleCluster } from './ClusteringEngine';
+
+export interface AIWriterConfig {
+    id: string;
+    alias: string;
+    category: string;
+    systemPrompt: string;
+}
+
+export interface SynthesizedArticle {
+    title: string;
+    summary: string;
+    content: string; // Markdown without sources appended
+    sources: string[];
+    imageUrl?: string;
+    publishedAt: string;
+    authorAlias: string;
+    category: string;
+}
+
+export class SynthesisEngine {
+    private ai: GoogleGenAI;
+    private writers: AIWriterConfig[];
+
+    constructor(writers: AIWriterConfig[]) {
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error('GEMINI_API_KEY is not set');
+        }
+        this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        this.writers = writers;
+    }
+
+    private async categorizeCluster(cluster: ArticleCluster): Promise<AIWriterConfig> {
+        if (!this.writers || this.writers.length === 0) {
+            throw new Error("No AI writers configured.");
+        }
+        const prompt = `Classify this news cluster's headline into exactly one of these IDs: ${this.writers.map(w => w.id).join(', ')}. 
+        Headline: "${cluster.themeHeadline}"
+        Respond with JUST the ID, nothing else.`;
+        
+        try {
+             const response = await this.ai.models.generateContent({
+                 model: 'gemini-3.1-flash-lite',
+                 contents: prompt,
+                 config: { temperature: 0.1 }
+             });
+             const categoryId = response.text?.trim().toLowerCase();
+             const writer = this.writers.find(w => w.id.toLowerCase() === categoryId);
+             return writer || this.writers[0]; // fallback
+        } catch (e) {
+             console.error("[Synthesis] Error during categorization:", e);
+             return this.writers[0];
+        }
+    }
+
+    public async synthesize(cluster: ArticleCluster): Promise<SynthesizedArticle | null> {
+        console.log(`[Synthesis] Synthesizing cluster: "${cluster.themeHeadline}" (${cluster.articles.length} sources)`);
+        
+        const writer = await this.categorizeCluster(cluster);
+        console.log(`[Synthesis] Selected Writer: ${writer.alias} (${writer.category})`);
+
+        const prompt = `
+You are an autonomous AI journalist for the "Red Letter" newspaper.
+Your task is to synthesize raw articles from different publishers into a SINGLE, perfectly unbiased, highly readable news article.
+
+YOUR PERSONA:
+Alias: ${writer.alias}
+Role: ${writer.category} reporter
+${writer.systemPrompt}
+
+RULES:
+1. PURE OBJECTIVITY: Strip away ideological spin, sensationalism, loaded adjectives, and editorializing.
+2. UNIVERSAL FACTS: Cross-reference the articles. Only include widely agreed-upon facts. Disagreements must be stated neutrally.
+3. FORMATTING: Output beautifully formatted Markdown. Use paragraphs, bullet points if necessary. Do NOT wrap the entire response in markdown code blocks (\`\`\`markdown). Just output the raw markdown.
+4. NO SOURCES IN MARKDOWN: DO NOT append or list the source URLs at the bottom of the markdown. Our frontend UI will handle the sources separately.
+5. LENGTH: Approx 400-800 words.
+
+Respond ONLY with a JSON object in this exact format:
+{
+  "title": "A perfectly neutral, engaging headline",
+  "summary": "A concise 2-sentence summary of the article",
+  "content": "The full markdown content of the synthesized article without sources appended"
+}
+
+RAW SOURCE ARTICLES:
+${cluster.articles.map((a, i) => `--- SOURCE ${i+1} (${a.publisherId}) ---\nURL: ${a.url}\nTITLE: ${a.title}\nCONTENT: ${a.content.substring(0, 3000)}...\n`).join('\n')}
+`;
+
+        try {
+            await new Promise(r => setTimeout(r, 4500)); // Respect rate limits
+
+            const response = await this.ai.models.generateContent({
+                model: 'gemini-3.1-flash-lite',
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    temperature: 0.2, // Slightly creative to allow persona, but still objective
+                }
+            });
+
+            if (!response.text) {
+                throw new Error("Empty response from LLM");
+            }
+
+            const result = JSON.parse(response.text);
+
+            if (result && result.title && result.content) {
+                const imageSource = cluster.articles.find(a => a.imageUrl && a.imageUrl.length > 5);
+                
+                return {
+                    title: result.title,
+                    summary: result.summary || "No summary provided.",
+                    content: result.content,
+                    sources: cluster.articles.map(a => a.url),
+                    imageUrl: imageSource?.imageUrl,
+                    publishedAt: new Date().toISOString(),
+                    authorAlias: writer.alias,
+                    category: writer.category
+                };
+            }
+        } catch (error: any) {
+            console.error(`[Synthesis] Error synthesizing cluster:`, error.message || error);
+        }
+        return null;
+    }
+}
