@@ -38,7 +38,9 @@ async function sendResultsWebhook(webhookUrl: string, authKey: string, clusters:
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authKey}`
+                'Authorization': `Bearer ${authKey}`,
+                'Bypass-Tunnel-Reminder': 'true',
+                'User-Agent': 'node-fetch'
             },
             body: JSON.stringify({
                 status: 'success',
