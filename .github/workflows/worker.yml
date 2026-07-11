@@ -1,0 +1,36 @@
+name: Engine Worker (Gather Phase)
+
+on:
+  repository_dispatch:
+    types: [start-gathering]
+  workflow_dispatch: # Also allow manual trigger for testing
+
+jobs:
+  gather:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Gathering Pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_PROJECT_ID: ${{ secrets.APPWRITE_PROJECT_ID }}
+          APPWRITE_DATABASE_ID: ${{ secrets.APPWRITE_DATABASE_ID }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          APPWRITE_RAW_CLUSTERS_COLLECTION_ID: ${{ secrets.APPWRITE_RAW_CLUSTERS_COLLECTION_ID }}
+          GITHUB_PAT: ${{ secrets.GITHUB_PAT }} # To trigger red-letter when done
+        run: npx ts-node src/index.ts
