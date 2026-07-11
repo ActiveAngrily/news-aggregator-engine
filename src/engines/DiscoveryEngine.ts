@@ -1,5 +1,5 @@
 import { BrowserService } from '../services/BrowserService';
-import { PublisherConfig } from '../config/publishers';
+import { PublisherConfig } from '../types';
 import type { Page } from 'playwright';
 
 export class DiscoveryEngine {

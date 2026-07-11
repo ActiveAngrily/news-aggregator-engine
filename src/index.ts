@@ -1,39 +1,55 @@
 import { DiscoveryEngine } from './engines/DiscoveryEngine';
 import { ExtractionEngine, ExtractedArticle } from './engines/ExtractionEngine';
 import { ClusteringEngine, ArticleCluster } from './engines/ClusteringEngine';
-import { publishers } from './config/publishers';
 import { BrowserService } from './services/BrowserService';
-import { Client, Databases, ID } from 'node-appwrite';
-import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 
-async function triggerFrontendSynthesis() {
-    const githubToken = process.env.GITHUB_PAT;
-    const githubRepo = 'ActiveAngrily/red-letter';
+interface PayloadConfig {
+    publishers: any[];
+    parameters?: {
+        similarityThreshold?: number;
+        maxUrlsPerPublisher?: number;
+    };
+    returnWebhookUrl: string;
+    authKey: string;
+}
+
+function loadConfig(): PayloadConfig {
+    const args = process.argv.slice(2);
+    const configArgIndex = args.indexOf('--config');
+    if (configArgIndex === -1 || configArgIndex + 1 >= args.length) {
+        throw new Error("Missing --config argument. Usage: node index.js --config payload.json");
+    }
     
-    if (!githubToken) {
-        console.warn('GITHUB_PAT is not set. Skipping webhook trigger to red-letter.');
-        return;
+    const configPath = path.resolve(args[configArgIndex + 1]);
+    if (!fs.existsSync(configPath)) {
+        throw new Error(`Config file not found at ${configPath}`);
     }
 
-    console.log(`[Webhook] Triggering synthesis pipeline in ${githubRepo}...`);
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    return JSON.parse(configContent) as PayloadConfig;
+}
+
+async function sendResultsWebhook(webhookUrl: string, authKey: string, clusters: ArticleCluster[]) {
+    console.log(`[Webhook] Sending clustered results to ${webhookUrl}...`);
     try {
-        const response = await fetch(`https://api.github.com/repos/${githubRepo}/dispatches`, {
+        const response = await fetch(webhookUrl, {
             method: 'POST',
             headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Authorization': `token ${githubToken}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authKey}`
             },
             body: JSON.stringify({
-                event_type: 'start-synthesis',
-                client_payload: { message: 'Gathering phase complete' }
+                status: 'success',
+                clusters: clusters
             })
         });
 
         if (response.ok) {
-            console.log('[Webhook] Successfully triggered Project B synthesis action!');
+            console.log('[Webhook] Successfully returned data to Commander!');
         } else {
-            console.error('[Webhook] Failed to trigger Project B action:', await response.text());
+            console.error('[Webhook] Failed to return data:', await response.text());
         }
     } catch (error) {
         console.error('[Webhook] Error sending webhook:', error);
@@ -41,20 +57,29 @@ async function triggerFrontendSynthesis() {
 }
 
 async function runGatherPipeline() {
-    console.log('Starting Red Letter Engine (Gather Phase)...');
+    console.log('Starting Programmable Red Letter Engine (Gather Phase)...');
     
+    let config: PayloadConfig;
+    try {
+        config = loadConfig();
+    } catch (err: any) {
+        console.error("Failed to load configuration:", err.message);
+        process.exit(1);
+    }
+
     const discoveryEngine = new DiscoveryEngine();
     const extractionEngine = new ExtractionEngine();
     const allExtractedArticles: ExtractedArticle[] = [];
+    const maxUrls = config.parameters?.maxUrlsPerPublisher ?? 75;
 
     try {
         // Phase 1: Scraping
-        for (const publisher of publishers) {
+        for (const publisher of config.publishers) {
             console.log(`\n--- Processing Publisher: ${publisher.name} ---`);
             const discoveredUrls = await discoveryEngine.discoverArticles(publisher);
             
-            // Limit to 75 URLs per publisher for performance
-            const targetUrls = discoveredUrls.slice(0, 75);
+            // Limit to max URLs per publisher for performance
+            const targetUrls = discoveredUrls.slice(0, maxUrls);
             
             for (let i = 0; i < targetUrls.length; i++) {
                 const url = targetUrls[i];
@@ -70,51 +95,47 @@ async function runGatherPipeline() {
         console.log(`Successfully scraped ${allExtractedArticles.length} total articles.`);
         
         // Phase 2: Clustering
-        const clusteringEngine = new ClusteringEngine();
+        const clusteringEngine = new ClusteringEngine({ 
+            similarityThreshold: config.parameters?.similarityThreshold 
+        });
+        
         const verifiedClusters = await clusteringEngine.clusterArticles(allExtractedArticles);
         
-        // Phase 3: Push to Appwrite
-        console.log('\n[Appwrite] Saving clusters to database...');
-        
-        const client = new Client()
-            .setEndpoint(process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1')
-            .setProject(process.env.APPWRITE_PROJECT_ID!)
-            .setKey(process.env.APPWRITE_API_KEY!);
-
-        const databases = new Databases(client);
-        const dbId = process.env.APPWRITE_DATABASE_ID!;
-        const rawClustersCollectionId = process.env.APPWRITE_RAW_CLUSTERS_COLLECTION_ID!;
-
-        let savedCount = 0;
-        for (const cluster of verifiedClusters) {
-            try {
-                await databases.createDocument(
-                    dbId,
-                    rawClustersCollectionId,
-                    ID.unique(),
-                    {
-                        clusterId: cluster.id,
-                        themeHeadline: cluster.themeHeadline,
-                        // Serialize the articles array to a JSON string because Appwrite limits array depths
-                        articlesJson: JSON.stringify(cluster.articles),
-                        status: 'pending' // So Project B knows what to process
-                    }
-                );
-                savedCount++;
-            } catch (err) {
-                console.error(`Failed to save cluster ${cluster.themeHeadline}:`, err);
-            }
+        // Phase 3: Webhook Return (replaces Appwrite)
+        if (config.returnWebhookUrl && config.authKey) {
+            await sendResultsWebhook(config.returnWebhookUrl, config.authKey, verifiedClusters);
+        } else {
+            console.warn('[Webhook] Missing returnWebhookUrl or authKey in config. Skipping return.');
+            // Dump to file if needed for debugging
+            fs.writeFileSync('output.json', JSON.stringify(verifiedClusters, null, 2));
+            console.log('Dumped output to output.json instead.');
         }
-        
-        console.log(`[Appwrite] Successfully saved ${savedCount} clusters.`);
-
-        // Phase 4: Trigger Project B (red-letter)
-        await triggerFrontendSynthesis();
 
         console.log(`\nGather Pipeline Completed Successfully!`);
 
     } catch (error) {
         console.error('Gather Pipeline Failed:', error);
+        
+        // Send failure webhook if possible
+        if (config?.returnWebhookUrl && config?.authKey) {
+            try {
+                await fetch(config.returnWebhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${config.authKey}`
+                    },
+                    body: JSON.stringify({
+                        status: 'error',
+                        error: error instanceof Error ? error.message : String(error)
+                    })
+                });
+            } catch (webhookErr) {
+                console.error('Also failed to send error webhook:', webhookErr);
+            }
+        }
+        process.exit(1);
+
     } finally {
         await BrowserService.getInstance().close();
     }

@@ -1,36 +1,34 @@
-name: Engine Worker (Gather Phase)
+name: Red Letter Engine Worker
 
 on:
   repository_dispatch:
     types: [start-gathering]
-  workflow_dispatch: # Also allow manual trigger for testing
 
 jobs:
-  gather:
+  gather-and-cluster:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install Dependencies
         run: npm ci
 
       - name: Install Playwright Browsers
-        run: npx playwright install chromium --with-deps
+        run: npx playwright install chromium
 
-      - name: Run Gathering Pipeline
+      - name: Create Payload Config
+        run: |
+          cat << 'EOF' > payload.json
+          ${{ toJson(github.event.client_payload) }}
+          EOF
+
+      - name: Run Engine
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
-          APPWRITE_PROJECT_ID: ${{ secrets.APPWRITE_PROJECT_ID }}
-          APPWRITE_DATABASE_ID: ${{ secrets.APPWRITE_DATABASE_ID }}
-          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
-          APPWRITE_RAW_CLUSTERS_COLLECTION_ID: ${{ secrets.APPWRITE_RAW_CLUSTERS_COLLECTION_ID }}
-          GITHUB_PAT: ${{ secrets.GITHUB_PAT }} # To trigger red-letter when done
-        run: npx ts-node src/index.ts
+        run: npx ts-node src/index.ts --config payload.json

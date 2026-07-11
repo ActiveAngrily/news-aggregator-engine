@@ -10,13 +10,14 @@ export interface ArticleCluster {
 
 export class ClusteringEngine {
     private ai: GoogleGenAI;
-    private similarityThreshold = 0.80;
+    private similarityThreshold: number;
 
-    constructor() {
+    constructor(options?: { similarityThreshold?: number }) {
         if (!process.env.GEMINI_API_KEY) {
             throw new Error('GEMINI_API_KEY is not set');
         }
         this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        this.similarityThreshold = options?.similarityThreshold ?? 0.80;
     }
 
     // Helper: Compute cosine similarity between two vectors
