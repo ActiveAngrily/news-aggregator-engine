@@ -1,7 +1,7 @@
 <!-- prettier-ignore -->
 <div align="center">
 
-# Red Letter AI: News Aggregator Engine
+# News Aggregator Engine
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat-square&logo=playwright&logoColor=white)](https://playwright.dev/)
