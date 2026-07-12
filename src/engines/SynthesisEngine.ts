@@ -74,8 +74,11 @@ RULES:
 1. PURE OBJECTIVITY: Strip away ideological spin, sensationalism, loaded adjectives, and editorializing.
 2. UNIVERSAL FACTS: Cross-reference the articles. Only include widely agreed-upon facts. Disagreements must be stated neutrally.
 3. FORMATTING: Output beautifully formatted Markdown. Use paragraphs, bullet points if necessary. Do NOT wrap the entire response in markdown code blocks (\`\`\`markdown). Just output the raw markdown.
-4. NO SOURCES IN MARKDOWN: DO NOT append or list the source URLs at the bottom of the markdown. Our frontend UI will handle the sources separately.
-5. LENGTH: Approx 400-800 words.
+4. INLINE CITATIONS: When citing a specific fact, quote, number, or claim, you MUST embed an inline markdown hyperlink to the exact source URL provided (e.g. \`[According to CNN](https://edition.cnn.com/...)\`). 
+5. NO SOURCES LIST AT BOTTOM: DO NOT append or list the source URLs at the bottom of the markdown. Our frontend UI will handle the sources list separately.
+6. ORGANIC IMAGERY: You have access to the IMAGE URLs provided in the raw source articles. You MUST embed these images dynamically within your markdown content to break up the text and illustrate the narrative. Use standard markdown image syntax: \`![Image description | Source: Publisher Name](IMAGE URL)\`. The caption MUST include the image description and credit the publisher. CRITICAL: DO NOT reuse the same image URL multiple times in the article. If you only have one unique image available, use it exactly once. If you have multiple unique images, embed them throughout the article.
+7. LENGTH: Approx 400-800 words.
+8. HEADLINES AND QUOTES: If your role is 'Opinion/Analysis reporter', you may occasionally use a highly significant direct quote from the original source as your headline (e.g., "The system is fundamentally broken"). Do not remove the quote from the article body. For all other reporters, stick to traditional neutral headlines.
 
 Respond ONLY with a JSON object in this exact format:
 {
@@ -85,7 +88,7 @@ Respond ONLY with a JSON object in this exact format:
 }
 
 RAW SOURCE ARTICLES:
-${cluster.articles.map((a, i) => `--- SOURCE ${i+1} (${a.publisherId}) ---\nURL: ${a.url}\nTITLE: ${a.title}\nCONTENT: ${a.content.substring(0, 3000)}...\n`).join('\n')}
+${cluster.articles.map((a, i) => `--- SOURCE ${i+1} (${a.publisherId}) ---\nURL: ${a.url}\nIMAGE URL: ${a.imageUrl || 'None'}\nTITLE: ${a.title}\nCONTENT: ${a.content.substring(0, 3000)}...\n`).join('\n')}
 `;
 
         try {

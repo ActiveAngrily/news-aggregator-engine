@@ -1,0 +1,31 @@
+name: Chief Editor Action
+
+on:
+  repository_dispatch:
+    types: [start-chief-editor]
+
+jobs:
+  run-chief-editor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Chief Editor
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT_ID }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          DATABASE_ID: ${{ secrets.APPWRITE_DATABASE_ID }}
+          ARTICLES_COLLECTION_ID: ${{ secrets.APPWRITE_ARTICLES_COLLECTION_ID }}
+          EDITIONS_COLLECTION_ID: ${{ secrets.APPWRITE_EDITIONS_COLLECTION_ID }}
+        run: npx tsx src/chief-editor.ts

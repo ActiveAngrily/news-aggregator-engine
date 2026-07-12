@@ -121,25 +121,24 @@ export class ClusteringEngine {
 
         console.log(`[Clustering] Mathematically formed ${clusters.length} provisional clusters.`);
 
-        // 3. LLM Verification (Fail-Safe)
+        // 3. LLM Verification (Fail-Safe) & Importance Rating
         const verifiedClusters: ArticleCluster[] = [];
         let verificationRequestCount = 0;
 
-        for (const cluster of clusters) {
-            // Must have at least 2 distinct publishers
-            const publisherSet = new Set(cluster.map(a => a.publisherId));
-            if (publisherSet.size < 2) {
-                console.log(`[Clustering] Dropped cluster (only ${publisherSet.size} publishers). Headline: ${cluster[0].title}`);
-                continue;
-            }
+        const multiSourceClusters = clusters.filter(c => new Set(c.map(a => a.publisherId)).size >= 2);
+        const singleSourceClusters = clusters.filter(c => new Set(c.map(a => a.publisherId)).size === 1);
 
+        console.log(`[Clustering] Processing ${multiSourceClusters.length} multi-source and ${singleSourceClusters.length} single-source clusters.`);
+
+        // Process Multi-Source Clusters
+        for (const cluster of multiSourceClusters) {
             if (verificationRequestCount > 0 && verificationRequestCount % 14 === 0) {
                 console.log(`[Clustering] Hit 14 LLM verifications. Sleeping 60s for rate limit...`);
                 await sleep(60000);
             }
             verificationRequestCount++;
 
-            console.log(`[Clustering] Verifying cluster with ${cluster.length} articles...`);
+            console.log(`[Clustering] Verifying multi-source cluster with ${cluster.length} articles...`);
             
             const prompt = `
 You are a strict news editor. Below is a list of article headlines and URLs.
@@ -158,7 +157,6 @@ Reply ONLY with a JSON object in this exact format, with no markdown formatting 
 `;
             
             try {
-                // Sleep for 4.5 seconds to respect the 15 RPM limit of gemini-3.1-flash-lite
                 await new Promise(r => setTimeout(r, 4500));
                 
                 const response = await this.ai.models.generateContent({
@@ -166,7 +164,7 @@ Reply ONLY with a JSON object in this exact format, with no markdown formatting 
                     contents: prompt,
                     config: {
                         responseMimeType: 'application/json',
-                        temperature: 0.1, // Keep it highly objective and deterministic
+                        temperature: 0.1,
                     }
                 });
 
@@ -183,13 +181,83 @@ Reply ONLY with a JSON object in this exact format, with no markdown formatting 
                             themeHeadline: result.themeHeadline,
                             articles: validArticles
                         });
-                        console.log(`  -> Verified! Theme: ${result.themeHeadline}`);
+                        console.log(`  -> Verified Multi-Source! Theme: ${result.themeHeadline}`);
                     } else {
-                        console.log(`  -> Dropped after LLM filtering (not enough publishers remaining).`);
+                        console.log(`  -> Dropped multi-source after LLM filtering (not enough publishers remaining).`);
                     }
                 }
             } catch (err) {
                 console.error(`[Clustering] LLM Verification failed for a cluster:`, err);
+            }
+        }
+
+        // Process Single-Source Clusters (Batch Rating)
+        const singleSourceBatchSize = 20;
+        for (let i = 0; i < singleSourceClusters.length; i += singleSourceBatchSize) {
+            if (verificationRequestCount > 0 && verificationRequestCount % 14 === 0) {
+                console.log(`[Clustering] Hit 14 LLM verifications. Sleeping 60s for rate limit...`);
+                await sleep(60000);
+            }
+            verificationRequestCount++;
+
+            const batch = singleSourceClusters.slice(i, i + singleSourceBatchSize);
+            console.log(`[Clustering] Rating importance for single-source batch of ${batch.length} clusters...`);
+
+            // Attach a temporary numeric ID for the batch mapping
+            const batchMapping = batch.map((c, index) => ({ tempId: index, cluster: c, title: c[0].title }));
+
+            const prompt = `
+You are a senior news editor. Evaluate the global or national importance of the following news headlines.
+Rate each headline on a scale of 1 to 10, where:
+- 1-3: Trivial, local, or niche news (e.g. minor sports updates, celebrity gossip, local crime)
+- 4-5: Moderate importance (e.g. routine political announcements, standard business news)
+- 6-8: High importance (e.g. major policy changes, significant economic events, major tech breakthroughs)
+- 9-10: Critical global/national news (e.g. wars, major disasters, historic elections)
+
+Here are the headlines:
+${batchMapping.map(m => `ID: ${m.tempId} | Headline: ${m.title}`).join('\n')}
+
+Reply ONLY with a JSON array of objects, strictly following this schema, with no other text:
+[
+  { "id": 0, "rating": 8 },
+  { "id": 1, "rating": 4 }
+]
+`;
+
+            try {
+                await new Promise(r => setTimeout(r, 4500));
+                
+                const response = await this.ai.models.generateContent({
+                    model: 'gemini-3.1-flash-lite',
+                    contents: prompt,
+                    config: {
+                        responseMimeType: 'application/json',
+                        temperature: 0.1,
+                    }
+                });
+
+                const text = response.text || '';
+                const results = JSON.parse(text);
+
+                if (Array.isArray(results)) {
+                    for (const result of results) {
+                        if (result.rating >= 6) {
+                            const matched = batchMapping.find(m => m.tempId === result.id);
+                            if (matched) {
+                                verifiedClusters.push({
+                                    id: crypto.randomUUID(),
+                                    themeHeadline: matched.title, // Use original title as theme for single-source
+                                    articles: matched.cluster
+                                });
+                                console.log(`  -> Verified Single-Source (Rating: ${result.rating})! Theme: ${matched.title}`);
+                            }
+                        } else {
+                            console.log(`  -> Dropped Single-Source (Rating: ${result.rating}): ${batchMapping.find(m => m.tempId === result.id)?.title}`);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(`[Clustering] LLM Rating failed for a single-source batch:`, err);
             }
         }
 
