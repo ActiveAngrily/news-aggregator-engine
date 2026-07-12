@@ -1,0 +1,49 @@
+name: Run Daily Edition
+
+on:
+  schedule:
+    # Run every day at 8:00 AM UTC (adjust as needed)
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    # Allows manual triggering from the GitHub Actions tab
+
+jobs:
+  run-edition:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium
+
+      - name: Run News Gather & Synthesis Phase
+        run: npx tsx src/index.ts --config payload.json
+        env:
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT }}
+          DATABASE_ID: ${{ secrets.DATABASE_ID }}
+          ARTICLES_COLLECTION_ID: ${{ secrets.ARTICLES_COLLECTION_ID }}
+
+      - name: Run Chief Editor Layout Phase
+        run: npx tsx src/run-all-editors.ts
+        env:
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT }}
+          DATABASE_ID: ${{ secrets.DATABASE_ID }}
+          ARTICLES_COLLECTION_ID: ${{ secrets.ARTICLES_COLLECTION_ID }}
+          EDITIONS_COLLECTION_ID: ${{ secrets.EDITIONS_COLLECTION_ID }}
