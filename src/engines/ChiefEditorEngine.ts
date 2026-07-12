@@ -28,7 +28,8 @@ export class ChiefEditorEngine {
             title: a.title,
             summary: a.summary,
             score: a.importanceScore || 5,
-            category: a.category || 'News'
+            category: a.category || 'News',
+            author: a.author || ''
         }));
 
         const slotDescriptions = this.templateBlocks.map(b => `${b.id}: Needs exactly ${b.maxArticles} articles.`).join('\n');

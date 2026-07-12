@@ -39,12 +39,14 @@ const CATEGORY_TEMPLATE = [
 
 const PROMPTS = {
     frontpage: `You are the Chief Editor of a major digital newspaper. Your job is to take the day's synthesized articles and place them into the slots of our fixed frontpage layout template.
-Rules: Place most important stories in "block-hero", organically group related articles.`,
+Rules: 
+1. Place most important stories in "block-hero", organically group related articles.
+2. CRITICAL: Any article whose author starts with "OPINION:" is an Op-Ed. You MUST place Op-Eds ONLY in slots of type "OPINION_COLUMN" (e.g., "block-top-opinion", "block-business-opinion"). Do NOT place them in standard news slots.`,
     
     tech: `You are the Tech Editor of a major digital newspaper (e.g. NYT Technology, The Verge). Your goal is to lay out the technology section using our fixed template.
 Editorial Philosophy:
 1. "cat-hero": Prioritize high-stakes, macro-level news over standard consumer product releases. Lead with AI regulation, corporate lawsuits, big tech accountability, and industry-shifting events.
-2. "cat-opinion": Highlight podcasts, newsletters, opinion columns, and deep conversations around tech's societal impact.
+2. "cat-opinion": CRITICAL: Any article whose author starts with "OPINION:" is an Op-Ed. You MUST place Op-Eds ONLY in this slot.
 3. "cat-feature": Focus on consumer utility—personal technology, hardware reviews, actionable "How-To" journalism, and lifestyle tech.
 4. Other slots: Use for a fast-paced breaking news feed on earnings reports, minor product launches, and daily industry shifts.
 Place the best articles in the designated slots.`,
@@ -53,18 +55,22 @@ Place the best articles in the designated slots.`,
 Editorial Philosophy:
 1. "cat-hero": The focal point. Use it for the most important stories of the day with high-impact journalism (e.g. major policy impacts, corporate strategy).
 2. "cat-top-briefing": Group immediate, market-moving data, earnings reports, and breaking corporate news.
-3. "cat-feature" & "cat-opinion": Deeper thematic pieces, deal-making analysis, personal finance insights, and thematic features.
+3. "cat-opinion": CRITICAL: Any article whose author starts with "OPINION:" is an Op-Ed. You MUST place Op-Eds ONLY in this slot.
+4. "cat-feature": Deeper thematic pieces, deal-making analysis, personal finance insights, and thematic features.
 Organize the complex web of markets, tech, and the economy into these easily digestible buckets.`,
     
     india: `You are the India Editor of a major digital newspaper (e.g. Times of India, The Hindu). Your goal is to lay out the national news section using our fixed template.
 Editorial Philosophy:
 1. "cat-hero": Dedicate this space to 1-3 major national stories to set the daily agenda. Focus on hard politics or massive national events.
 2. "cat-top-briefing": Treat this as a high-velocity, fast-paced breaking news ticker. Fill it with immediate updates, political maneuvers, and urgent developments.
-3. "cat-opinion" & "cat-feature": Curated digests and regional connections. Acknowledge that national interest often intersects with local relevance.
+3. "cat-opinion": CRITICAL: Any article whose author starts with "OPINION:" is an Op-Ed. You MUST place Op-Eds ONLY in this slot.
+4. "cat-feature": Curated digests and regional connections. Acknowledge that national interest often intersects with local relevance.
 Mix hard politics, regional issues, and human interest stories to capture a dense, fast-paced national happening.`,
 
     generic: `You are the Category Editor of a major digital newspaper. Your goal is to lay out this category's section using our fixed template.
-Rules: Place the most important stories in "cat-hero", and organize the rest logically.`
+Rules: 
+1. Place the most important stories in "cat-hero", and organize the rest logically.
+2. CRITICAL: Any article whose author starts with "OPINION:" is an Op-Ed. You MUST place Op-Eds ONLY in slots of type "OPINION_COLUMN" (like "cat-opinion").`
 };
 
 async function runAllEditors() {
@@ -100,10 +106,13 @@ async function runAllEditors() {
 
     const categories = {
         frontpage: allArticles,
-        tech: allArticles.filter(a => a.category === 'Technology & Science'),
-        business: allArticles.filter(a => a.category === 'Business & Economy'),
+        tech: allArticles.filter(a => a.category === 'Tech'),
+        business: allArticles.filter(a => a.category === 'Business'),
         india: allArticles.filter(a => a.category === 'India'),
-        politics: allArticles.filter(a => a.category === 'Politics & World')
+        politics: allArticles.filter(a => a.category === 'Politics'),
+        world: allArticles.filter(a => a.category === 'World'),
+        sports: allArticles.filter(a => a.category === 'Sports'),
+        culture: allArticles.filter(a => a.category === 'Culture')
     };
 
     const finalLayoutData: Record<string, any> = {};
