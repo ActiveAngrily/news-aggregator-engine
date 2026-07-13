@@ -117,15 +117,62 @@ async function runGatherPipeline() {
             finalPayloadData = { status: 'success', clusters: verifiedClusters };
         }
         
-        // Phase 3: Webhook Return
-        if (config.returnWebhookUrl && config.authKey) {
-            await sendResultsWebhook(config.returnWebhookUrl, config.authKey, finalPayloadData);
-        } else {
-            console.warn('[Webhook] Missing returnWebhookUrl or authKey in config. Skipping return.');
-            // Dump to file if needed for debugging
-            fs.writeFileSync('output.json', JSON.stringify(finalPayloadData, null, 2));
-            console.log('Dumped output to output.json instead.');
+        // Phase 3: Save to Appwrite Database
+        console.log('Saving synthesized articles to Appwrite database...');
+        const { Client, Databases } = require('node-appwrite');
+        const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
+        const APPWRITE_PROJECT = process.env.APPWRITE_PROJECT || '6a4aa5bd002851ccd0c8';
+        const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY as string;
+        const DATABASE_ID = process.env.DATABASE_ID || 'news_aggregator_db';
+        const ARTICLES_COLLECTION_ID = process.env.ARTICLES_COLLECTION_ID || 'articles';
+
+        const client = new Client()
+            .setEndpoint(APPWRITE_ENDPOINT)
+            .setProject(APPWRITE_PROJECT)
+            .setKey(APPWRITE_API_KEY);
+        const databases = new Databases(client);
+
+        let successCount = 0;
+        let failCount = 0;
+        const finalArticles = finalPayloadData?.articles || [];
+
+        for (const article of finalArticles) {
+            try {
+                // Determine ID based on URL hash or ID if present
+                const articleId = article.id || 'unique()';
+                
+                await databases.createDocument(
+                    DATABASE_ID,
+                    ARTICLES_COLLECTION_ID,
+                    articleId,
+                    {
+                        title: article.title,
+                        summary: article.summary,
+                        content: article.content,
+                        category: article.category,
+                        author: article.author || 'AI Editor',
+                        sourceUrl: article.sourceUrl || article.urls?.[0] || '',
+                        sourcePublisher: article.sourcePublisher || article.publishers?.[0] || 'Unknown',
+                        publishedAt: article.publishedAt || new Date().toISOString(),
+                        imageUrl: article.imageUrl || null,
+                        readTimeMinutes: article.readTimeMinutes || 3
+                    }
+                );
+                successCount++;
+                console.log(`Saved: ${article.title}`);
+            } catch (err: any) {
+                if (err.code === 409) {
+                    console.log(`Skipped (Already Exists): ${article.title}`);
+                } else {
+                    failCount++;
+                    console.error(`Error saving ${article.title}:`, err.message);
+                }
+            }
         }
+        console.log(`Appwrite Upload Complete! Success: ${successCount}, Failed: ${failCount}`);
+
+        // Dump to file if needed for debugging
+        fs.writeFileSync('output.json', JSON.stringify(finalPayloadData, null, 2));
 
         console.log(`\nGather Pipeline Completed Successfully!`);
 
