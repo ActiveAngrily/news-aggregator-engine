@@ -120,22 +120,49 @@ ${cluster.articles.map((a, i) => `--- SOURCE ${i+1} (${a.publisherId}) ---\nURL:
 `;
 
         try {
-            await new Promise(r => setTimeout(r, 4500)); // Respect rate limits
+            let response;
+            let retries = 3;
+            while (retries > 0) {
+                try {
+                    await new Promise(r => setTimeout(r, 4500)); // Respect rate limits
 
-            const response = await this.ai.models.generateContent({
-                model: 'gemini-3.1-flash-lite',
-                contents: prompt,
-                config: {
-                    responseMimeType: 'application/json',
-                    temperature: 0.2, // Slightly creative to allow persona, but still objective
+                    response = await this.ai.models.generateContent({
+                        model: 'gemini-3.1-flash-lite',
+                        contents: prompt,
+                        config: {
+                            responseMimeType: 'application/json',
+                            temperature: 0.2, // Slightly creative to allow persona, but still objective
+                        }
+                    });
+                    break; // Success
+                } catch (apiError: any) {
+                    if (apiError?.status === 503 || apiError?.message?.includes('503') || apiError?.status === 'UNAVAILABLE') {
+                        console.warn(`[Synthesis] Model unavailable (503). Retries left: ${retries - 1}`);
+                        retries--;
+                        if (retries === 0) throw apiError;
+                        await new Promise(r => setTimeout(r, 10000)); // Wait longer before retry
+                    } else {
+                        throw apiError; // Other errors, rethrow
+                    }
                 }
-            });
+            }
 
-            if (!response.text) {
+            if (!response || !response.text) {
                 throw new Error("Empty response from LLM");
             }
 
-            const result = JSON.parse(response.text);
+            let cleanedText = response.text.trim();
+            if (cleanedText.startsWith('```json')) {
+                cleanedText = cleanedText.substring(7);
+            } else if (cleanedText.startsWith('```')) {
+                cleanedText = cleanedText.substring(3);
+            }
+            if (cleanedText.endsWith('```')) {
+                cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+            }
+            cleanedText = cleanedText.trim();
+
+            const result = JSON.parse(cleanedText);
 
             if (result && result.title && result.content) {
                 const imageSource = cluster.articles.find(a => a.imageUrl && a.imageUrl.length > 5);
