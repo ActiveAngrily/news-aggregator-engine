@@ -27,6 +27,11 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install chromium
 
+      - name: Fetch Configuration from Red Letter
+        run: |
+          echo "Fetching config for branch: ${{ github.ref_name }}"
+          curl -s -f "https://red-letter-three.vercel.app/api/config?branch=${{ github.ref_name }}" > payload.json
+
       - name: Run News Gather & Synthesis Phase
         run: npx tsx src/index.ts --config payload.json
         env:
