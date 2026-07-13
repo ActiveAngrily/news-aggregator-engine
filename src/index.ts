@@ -149,6 +149,7 @@ async function runGatherPipeline() {
                         title: article.title,
                         summary: article.summary,
                         content: article.content,
+                        markdownContent: article.content,
                         category: article.category,
                         author: article.author || 'AI Editor',
                         sourceUrl: article.sourceUrl || article.urls?.[0] || '',
