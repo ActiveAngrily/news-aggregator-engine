@@ -11,6 +11,7 @@ interface PayloadConfig {
     parameters?: {
         similarityThreshold?: number;
         maxUrlsPerPublisher?: number;
+        collectionId?: string;
     };
     returnWebhookUrl: string;
     authKey: string;
@@ -124,7 +125,7 @@ async function runGatherPipeline() {
         const APPWRITE_PROJECT = process.env.APPWRITE_PROJECT || '6a4aa5bd002851ccd0c8';
         const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY as string;
         const DATABASE_ID = process.env.DATABASE_ID || 'news_aggregator_db';
-        const ARTICLES_COLLECTION_ID = process.env.ARTICLES_COLLECTION_ID || 'articles';
+        const ARTICLES_COLLECTION_ID = config.parameters?.collectionId || process.env.ARTICLES_COLLECTION_ID || 'articles';
 
         const client = new Client()
             .setEndpoint(APPWRITE_ENDPOINT)
