@@ -131,9 +131,7 @@ async function runGatherPipeline() {
                         category: article.category,
                         author: article.author || 'AI Editor',
                         sources: article.sources || article.urls || [],
-                        publishedAt: article.publishedAt || new Date().toISOString(),
-                        imageUrl: article.imageUrl || null,
-                        readTimeMinutes: article.readTimeMinutes || 3
+                        imageUrl: article.imageUrl || null
                     }
                 );
                 successCount++;
