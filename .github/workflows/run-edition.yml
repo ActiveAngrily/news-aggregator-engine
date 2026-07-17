@@ -32,6 +32,17 @@ jobs:
           echo "Fetching config for branch: ${{ github.ref_name }}"
           curl -s -f "https://red-letter-three.vercel.app/api/config?branch=${{ github.ref_name }}" > payload.json
 
+      - name: Set Collection IDs based on Branch
+        run: |
+          if [ "${{ github.ref_name }}" == "main" ]; then
+            echo "ARTICLES_COLLECTION_ID=${{ secrets.ARTICLES_COLLECTION_ID }}" >> $GITHUB_ENV
+            echo "EDITIONS_COLLECTION_ID=${{ secrets.EDITIONS_COLLECTION_ID }}" >> $GITHUB_ENV
+          else
+            echo "ARTICLES_COLLECTION_ID=articles_staging" >> $GITHUB_ENV
+            echo "EDITIONS_COLLECTION_ID=editions_staging" >> $GITHUB_ENV
+          fi
+
+
       - name: Run News Gather & Synthesis Phase
         run: npx tsx src/index.ts --config payload.json
         env:
@@ -40,7 +51,6 @@ jobs:
           APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
           APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT }}
           DATABASE_ID: ${{ secrets.DATABASE_ID }}
-          ARTICLES_COLLECTION_ID: ${{ secrets.ARTICLES_COLLECTION_ID }}
 
       - name: Run Chief Editor Layout Phase
         run: npx tsx src/run-all-editors.ts
@@ -50,5 +60,3 @@ jobs:
           APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
           APPWRITE_PROJECT: ${{ secrets.APPWRITE_PROJECT }}
           DATABASE_ID: ${{ secrets.DATABASE_ID }}
-          ARTICLES_COLLECTION_ID: ${{ secrets.ARTICLES_COLLECTION_ID }}
-          EDITIONS_COLLECTION_ID: ${{ secrets.EDITIONS_COLLECTION_ID }}

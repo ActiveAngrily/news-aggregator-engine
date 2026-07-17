@@ -33,29 +33,7 @@ function loadConfig(): PayloadConfig {
     return JSON.parse(configContent) as PayloadConfig;
 }
 
-async function sendResultsWebhook(webhookUrl: string, authKey: string, payloadData: any) {
-    console.log(`[Webhook] Sending final results to ${webhookUrl}...`);
-    try {
-        const response = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authKey}`,
-                'Bypass-Tunnel-Reminder': 'true',
-                'User-Agent': 'node-fetch'
-            },
-            body: JSON.stringify(payloadData)
-        });
 
-        if (response.ok) {
-            console.log('[Webhook] Successfully returned data to Commander!');
-        } else {
-            console.error('[Webhook] Failed to return data:', await response.text());
-        }
-    } catch (error) {
-        console.error('[Webhook] Error sending webhook:', error);
-    }
-}
 
 async function runGatherPipeline() {
     console.log('Starting Programmable Red Letter Engine (Gather Phase)...');
@@ -152,8 +130,7 @@ async function runGatherPipeline() {
                         markdownContent: article.content,
                         category: article.category,
                         author: article.author || 'AI Editor',
-                        sourceUrl: article.sourceUrl || article.urls?.[0] || '',
-                        sourcePublisher: article.sourcePublisher || article.publishers?.[0] || 'Unknown',
+                        sources: article.sources || article.urls || [],
                         publishedAt: article.publishedAt || new Date().toISOString(),
                         imageUrl: article.imageUrl || null,
                         readTimeMinutes: article.readTimeMinutes || 3
@@ -180,24 +157,7 @@ async function runGatherPipeline() {
     } catch (error) {
         console.error('Gather Pipeline Failed:', error);
         
-        // Send failure webhook if possible
-        if (config?.returnWebhookUrl && config?.authKey) {
-            try {
-                await fetch(config.returnWebhookUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${config.authKey}`
-                    },
-                    body: JSON.stringify({
-                        status: 'error',
-                        error: error instanceof Error ? error.message : String(error)
-                    })
-                });
-            } catch (webhookErr) {
-                console.error('Also failed to send error webhook:', webhookErr);
-            }
-        }
+
         process.exit(1);
 
     } finally {
