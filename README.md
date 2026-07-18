@@ -79,3 +79,8 @@ To run this pipeline locally or in CI, the following environment variables are r
 
 > [!NOTE]
 > The GitHub PAT is used by the frontend to trigger this repo via `repository_dispatch`, and is not needed by this repo itself.
+
+## Future Enhancements / To-Do
+
+- **Idempotency & Deduplication (Freshness Check):** Currently, running the engine multiple times a day will re-scrape and re-synthesize identical top stories if they remain on the publisher's homepage, leading to duplicate entries and wasted LLM tokens. 
+  - *Proposed Solution:* Implement an "Appwrite Memory Check" where the engine fetches a list of processed source URLs from the database (e.g. from the last 48 hours) and immediately skips discovering or extracting those URLs during the Discovery Phase.
