@@ -1,15 +1,14 @@
 import { Client, Databases, Query } from 'node-appwrite';
 import { ChiefEditorEngine } from './engines/ChiefEditorEngine';
-import * as dotenv from 'dotenv';
-dotenv.config();
+import { env } from './config/env';
 
-const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
-const APPWRITE_PROJECT = process.env.APPWRITE_PROJECT || '6a4aa5bd002851ccd0c8';
-const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY as string;
-const DATABASE_ID = process.env.DATABASE_ID || 'news_aggregator_db';
-const ARTICLES_COLLECTION_ID = process.env.ARTICLES_COLLECTION_ID || 'articles';
-const EDITIONS_COLLECTION_ID = process.env.EDITIONS_COLLECTION_ID || 'editions';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
+const APPWRITE_ENDPOINT = env.APPWRITE_ENDPOINT;
+const APPWRITE_PROJECT = env.APPWRITE_PROJECT;
+const APPWRITE_API_KEY = env.APPWRITE_API_KEY;
+const DATABASE_ID = env.DATABASE_ID;
+const ARTICLES_COLLECTION_ID = env.ARTICLES_COLLECTION_ID;
+const EDITIONS_COLLECTION_ID = env.EDITIONS_COLLECTION_ID;
+const GEMINI_API_KEY = env.GEMINI_API_KEY;
 
 const FRONTPAGE_TEMPLATE = [
     { id: 'block-hero', type: 'HERO_PACKAGE', colSpan: 12, maxArticles: 6 },

@@ -99,11 +99,12 @@ async function runGatherPipeline() {
         // Phase 3: Save to Appwrite Database
         console.log('Saving synthesized articles to Appwrite database...');
         const { Client, Databases } = require('node-appwrite');
-        const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
-        const APPWRITE_PROJECT = process.env.APPWRITE_PROJECT || '6a4aa5bd002851ccd0c8';
-        const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY as string;
-        const DATABASE_ID = process.env.DATABASE_ID || 'news_aggregator_db';
-        const ARTICLES_COLLECTION_ID = config.parameters?.collectionId || process.env.ARTICLES_COLLECTION_ID || 'articles';
+        const { env } = require('./config/env');
+        const APPWRITE_ENDPOINT = env.APPWRITE_ENDPOINT;
+        const APPWRITE_PROJECT = env.APPWRITE_PROJECT;
+        const APPWRITE_API_KEY = env.APPWRITE_API_KEY;
+        const DATABASE_ID = env.DATABASE_ID;
+        const ARTICLES_COLLECTION_ID = config.parameters?.collectionId || env.ARTICLES_COLLECTION_ID;
 
         const client = new Client()
             .setEndpoint(APPWRITE_ENDPOINT)

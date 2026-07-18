@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { ExtractedArticle } from './ExtractionEngine';
 import { ArticleCluster } from './ClusteringEngine';
+import { env } from '../config/env';
 
 export interface AIWriterConfig {
     id: string;
@@ -25,10 +26,10 @@ export class SynthesisEngine {
     private writers: AIWriterConfig[];
 
     constructor(writers: AIWriterConfig[]) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!env.GEMINI_API_KEY) {
             throw new Error('GEMINI_API_KEY is not set');
         }
-        this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        this.ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
         this.writers = writers;
     }
 

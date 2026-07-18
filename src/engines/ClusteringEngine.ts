@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { ExtractedArticle } from './ExtractionEngine';
 import * as crypto from 'crypto';
+import { env } from '../config/env';
 
 export interface ArticleCluster {
     id: string;
@@ -13,10 +14,10 @@ export class ClusteringEngine {
     private similarityThreshold: number;
 
     constructor(options?: { similarityThreshold?: number }) {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!env.GEMINI_API_KEY) {
             throw new Error('GEMINI_API_KEY is not set');
         }
-        this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        this.ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
         this.similarityThreshold = options?.similarityThreshold ?? 0.80;
     }
 
@@ -60,7 +61,7 @@ export class ClusteringEngine {
                 }
             }));
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:batchEmbedContents?key=${process.env.GEMINI_API_KEY}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:batchEmbedContents?key=${env.GEMINI_API_KEY}`;
             
             console.log(`[Clustering] Batch embedding ${batchArticles.length} articles (${i + 1} to ${Math.min(i + batchSize, articles.length)})...`);
             
