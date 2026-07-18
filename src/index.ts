@@ -129,7 +129,7 @@ async function runGatherPipeline() {
                         summary: article.summary,
                         markdownContent: article.content,
                         category: article.category,
-                        author: article.author || 'AI Editor',
+                        author: article.authorAlias || article.author || 'AI Editor',
                         sources: article.sources || article.urls || [],
                         imageUrl: article.imageUrl || null
                     }
